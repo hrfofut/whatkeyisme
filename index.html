@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Now Playing · Key</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #121212; --surface: #181818; --surface-2: #1f1f1f; --surface-3: #2a2a2a;
+    --text: #ffffff; --sub: #b3b3b3; --muted: #7a7a7a; --line: #2e2e2e;
+    --green: #1ed760; --green-d: #1db954; --accent: 30, 215, 96;
+    --tint: 40, 40, 40;
+    --playbar-h: 92px;
+    --font: "Circular", "Figtree", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--font);
+    -webkit-font-smoothing: antialiased; overflow-x: hidden;
+    display: grid; grid-template-rows: auto 1fr auto; min-height: 100vh;
+  }
+  a { color: inherit; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  button { font-family: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+  button:disabled { cursor: not-allowed; opacity: .35; }
+  [hidden] { display: none !important; }
+  :focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 4px; }
+
+  #bg {
+    position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background: linear-gradient(180deg, rgba(var(--tint), .75) 0%, rgba(var(--tint), .28) 38%, var(--bg) 78%);
+    transition: background 1.2s ease;
+  }
+
+  /* ---------- header ---------- */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 28px; gap: 16px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -.01em; font-size: 18px; }
+  .brand-mark {
+    width: 32px; height: 32px; border-radius: 50%; background: var(--green); color: #000;
+    display: grid; place-items: center;
+  }
+  .who { display: flex; align-items: center; gap: 10px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px 0 4px;
+    border-radius: 999px; background: rgba(0,0,0,.55); font-size: 14px; font-weight: 700;
+  }
+  .pill img, .pill .avatar-fallback { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; background: #535353; display: grid; place-items: center; font-size: 12px; }
+  .icon-btn { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: rgba(0,0,0,.55); color: var(--sub); }
+  .icon-btn:hover { color: #fff; transform: scale(1.04); }
+
+  /* ---------- main ---------- */
+  main { padding: 8px 28px calc(var(--playbar-h) + 48px); }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+
+  .center-card {
+    max-width: 560px; margin: 8vh auto 0; text-align: center;
+    background: rgba(24,24,24,.85); border-radius: 12px; padding: 40px 36px;
+  }
+  .center-card h2 { font-size: 32px; font-weight: 800; margin: 0 0 10px; letter-spacing: -.02em; }
+  .center-card p { color: var(--sub); line-height: 1.55; margin: 0 0 20px; }
+  .center-card code { background: #2a2a2a; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #fff; }
+  .btn-green {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    background: var(--green); color: #000; font-weight: 800; font-size: 16px;
+    height: 48px; padding: 0 32px; border-radius: 999px; transition: transform .1s, background .1s;
+  }
+  .btn-green:hover { transform: scale(1.04); background: #3be477; text-decoration: none; }
+  .btn-ghost {
+    display: inline-flex; align-items: center; height: 32px; padding: 0 15px; border-radius: 999px;
+    border: 1px solid #727272; font-weight: 700; font-size: 13px; color: #fff;
+  }
+  .btn-ghost:hover { border-color: #fff; transform: scale(1.04); }
+
+  .setup { text-align: left; }
+  .setup ol { color: var(--sub); padding-left: 20px; line-height: 1.6; margin: 0 0 22px; font-size: 14px; }
+  .setup ol b, .setup code { color: #fff; }
+  .setup code { background: #2a2a2a; padding: 2px 6px; border-radius: 4px; font-size: 13px; user-select: all; }
+  .field { display: block; margin-bottom: 16px; }
+  .field span { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+  .field small { color: var(--muted); font-weight: 500; }
+  .field input {
+    width: 100%; height: 44px; border-radius: 6px; border: 1px solid #727272; background: #121212;
+    color: #fff; font: inherit; font-size: 15px; padding: 0 12px;
+  }
+  .field input:focus { outline: none; border-color: #fff; box-shadow: 0 0 0 1px #fff; }
+  .setup .actions { display: flex; gap: 12px; align-items: center; margin-top: 8px; }
+
+  /* ---------- now playing ---------- */
+  .now { display: grid; grid-template-columns: minmax(240px, 360px) 1fr; gap: 40px; align-items: start; padding-top: 24px; }
+  .art-lg {
+    width: 100%; aspect-ratio: 1; border-radius: 8px; object-fit: cover; background: #282828;
+    box-shadow: 0 8px 40px rgba(0,0,0,.6);
+  }
+  .eyebrow { font-size: 13px; font-weight: 700; color: var(--sub); text-transform: none; display: flex; align-items: center; gap: 8px; }
+  .eq { display: inline-flex; gap: 2px; align-items: flex-end; height: 12px; }
+  .eq i { width: 3px; background: var(--green); border-radius: 1px; animation: eq 1s infinite ease-in-out; }
+  .eq i:nth-child(2) { animation-delay: -.4s } .eq i:nth-child(3) { animation-delay: -.7s }
+  .paused .eq i { animation-play-state: paused; }
+  @keyframes eq { 0%,100% { height: 3px } 50% { height: 12px } }
+  .title {
+    font-size: clamp(32px, 5.4vw, 72px); font-weight: 900; letter-spacing: -.04em; line-height: 1.02;
+    margin: 10px 0 12px; overflow-wrap: anywhere;
+  }
+  .artists { font-size: 16px; font-weight: 700; color: #fff; }
+  .artists a + a::before { content: ", "; }
+  .album { color: var(--sub); font-size: 14px; margin-top: 4px; }
+
+  .key-card {
+    margin-top: 28px; background: rgba(0,0,0,.35); border-radius: 12px; padding: 24px;
+    backdrop-filter: blur(6px);
+  }
+  .key-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .key-label { font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--sub); }
+  .key-name { font-size: clamp(40px, 5vw, 64px); font-weight: 900; letter-spacing: -.035em; line-height: 1; margin-top: 6px; }
+  .key-name .mode { color: var(--green); }
+  .key-sig { font-size: 15px; color: var(--sub); margin-top: 8px; font-weight: 500; }
+  .key-sig b { color: #fff; font-weight: 700; }
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(72px, auto)); gap: 4px 24px; text-align: left; }
+  .stat .v { font-size: 22px; font-weight: 800; }
+  .stat .l { font-size: 11px; color: var(--sub); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+
+  .piano { position: relative; height: 96px; margin: 22px 0 14px; display: flex; user-select: none; }
+  .wk {
+    flex: 1; background: #3a3a3a; border-right: 2px solid #121212; border-radius: 0 0 5px 5px;
+    position: relative; transition: background .3s;
+  }
+  .wk:last-child { border-right: 0; }
+  .wk.in { background: #e9e9e9; }
+  .wk.root { background: var(--green); }
+  .bk {
+    position: absolute; top: 0; height: 58%; background: #0d0d0d; border-radius: 0 0 4px 4px; z-index: 2;
+    border: 1px solid #000; transition: background .3s;
+  }
+  .bk.in { background: #8d8d8d; }
+  .bk.root { background: var(--green-d); }
+  .nlab { position: absolute; bottom: 6px; left: 0; right: 0; text-align: center; font-size: 11px; font-weight: 800; color: #121212; }
+  .bk .nlab { bottom: 5px; font-size: 9px; color: #000; }
+
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+  .row-label { font-size: 12px; color: var(--sub); font-weight: 700; margin-right: 4px; min-width: 92px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px;
+    background: rgba(255,255,255,.08); font-size: 13px; font-weight: 600; white-space: nowrap;
+  }
+  .chip.root { background: var(--green); color: #000; }
+  .chip .cam { color: var(--sub); font-weight: 700; font-size: 11px; }
+  .key-foot {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+    margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.08);
+    font-size: 12px; color: var(--sub);
+  }
+  .key-foot a { color: #fff; font-weight: 600; }
+  .warn { color: #ffd166; }
+  select.fix {
+    background: #2a2a2a; color: #fff; border: 1px solid #3e3e3e; border-radius: 999px;
+    height: 28px; padding: 0 10px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .linkish { color: #fff; font-weight: 600; text-decoration: underline; font-size: 12px; }
+
+  .skeleton { background: linear-gradient(90deg, #2a2a2a 25%, #333 37%, #2a2a2a 63%); background-size: 400% 100%; animation: sk 1.4s ease infinite; border-radius: 6px; }
+  @keyframes sk { 0% { background-position: 100% 50% } 100% { background-position: 0 50% } }
+  .key-empty { color: var(--sub); font-size: 15px; line-height: 1.5; }
+  .key-empty b { color: #fff; }
+
+  /* ---------- play bar ---------- */
+  .playbar {
+    position: fixed; left: 0; right: 0; bottom: 0; height: var(--playbar-h); z-index: 10;
+    background: #000; display: grid; grid-template-columns: 1fr minmax(320px, 2fr) 1fr; align-items: center;
+    padding: 0 16px; gap: 16px;
+  }
+  .pb-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .art-sm { width: 56px; height: 56px; border-radius: 4px; object-fit: cover; background: #282828; flex: none; }
+  .pb-meta { min-width: 0; }
+  .pb-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pb-artist { font-size: 12px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+  .pb-center { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .controls { display: flex; align-items: center; gap: 18px; }
+  .ctl { width: 32px; height: 32px; display: grid; place-items: center; color: var(--sub); position: relative; }
+  .ctl:hover:not(:disabled) { color: #fff; }
+  .ctl.on { color: var(--green); }
+  .ctl.on::after { content: ""; position: absolute; bottom: -1px; width: 4px; height: 4px; border-radius: 50%; background: var(--green); }
+  .ctl .one { position: absolute; top: 3px; right: 2px; font-size: 8px; font-weight: 900; background: #000; border-radius: 50%; width: 10px; height: 10px; display: grid; place-items: center; }
+  .play {
+    width: 34px; height: 34px; border-radius: 50%; background: #fff; color: #000; display: grid; place-items: center;
+    transition: transform .08s;
+  }
+  .play:hover:not(:disabled) { transform: scale(1.06); }
+  .progress-row { display: flex; align-items: center; gap: 8px; width: 100%; max-width: 640px; }
+  .time { font-size: 11px; color: var(--sub); min-width: 40px; font-variant-numeric: tabular-nums; }
+  .time.l { text-align: right; }
+  .bar { flex: 1; height: 16px; display: flex; align-items: center; cursor: pointer; touch-action: none; }
+  .bar-track { position: relative; width: 100%; height: 4px; border-radius: 2px; background: #4d4d4d; }
+  .bar-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: #fff; width: 0; }
+  .bar-knob { position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%; background: #fff; transform: translate(-50%, -50%); opacity: 0; box-shadow: 0 2px 4px rgba(0,0,0,.5); }
+  .bar:hover .bar-fill, .bar.drag .bar-fill { background: var(--green); }
+  .bar:hover .bar-knob, .bar.drag .bar-knob { opacity: 1; }
+  .bar.disabled { pointer-events: none; opacity: .5; }
+
+  .pb-right { display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-width: 0; }
+  .key-chip {
+    display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 999px;
+    background: rgba(var(--accent), .14); color: var(--green); font-size: 12px; font-weight: 800; white-space: nowrap;
+  }
+  .key-chip .k { color: #fff; }
+  .device { font-size: 11px; color: var(--green); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; display: flex; gap: 4px; align-items: center; }
+  .vol { display: flex; align-items: center; gap: 6px; }
+  input[type=range] {
+    -webkit-appearance: none; appearance: none; width: 96px; height: 4px; border-radius: 2px; cursor: pointer;
+    background: linear-gradient(to right, #fff var(--p, 50%), #4d4d4d var(--p, 50%));
+  }
+  input[type=range]:hover { background: linear-gradient(to right, var(--green) var(--p, 50%), #4d4d4d var(--p, 50%)); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #fff; opacity: 0; }
+  input[type=range]:hover::-webkit-slider-thumb { opacity: 1; }
+  input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: #fff; }
+  input[type=range]:disabled { opacity: .35; cursor: not-allowed; }
+
+  .attribution { position: fixed; right: 18px; bottom: calc(var(--playbar-h) + 10px); font-size: 11px; color: var(--muted); }
+  .attribution a { color: var(--sub); }
+
+  .toast {
+    position: fixed; left: 50%; bottom: calc(var(--playbar-h) + 20px); transform: translateX(-50%) translateY(10px);
+    background: #2e77d0; color: #fff; padding: 12px 18px; border-radius: 8px; font-size: 14px; font-weight: 600;
+    box-shadow: 0 8px 24px rgba(0,0,0,.5); opacity: 0; pointer-events: none; transition: .25s; z-index: 20; max-width: min(560px, 90vw); text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 860px) {
+    header, main { padding-left: 16px; padding-right: 16px; }
+    .now { grid-template-columns: 1fr; gap: 24px; }
+    .art-lg { max-width: 320px; margin: 0 auto; display: block; }
+    .playbar { grid-template-columns: 1fr auto; height: auto; padding: 10px 12px; row-gap: 6px; }
+    :root { --playbar-h: 118px; }
+    .pb-center { grid-column: 1 / -1; order: 3; }
+    .vol, .device { display: none; }
+    .attribution { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="bg"></div>
+
+<header>
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18.5a3 3 0 1 1-2-2.83V5.5l11-2v11a3 3 0 1 1-2-2.83V6.9l-7 1.27z"/></svg>
+    </span>
+    Now Playing · Key
+  </div>
+  <div class="who">
+    <span class="pill" id="me" hidden><span class="avatar-fallback" id="me-av"></span><span id="me-name"></span></span>
+    <button class="icon-btn" id="settings-btn" title="Settings" aria-label="Settings">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+
+    <!-- setup -->
+    <section class="center-card setup" id="view-setup" hidden>
+      <h2>Set up</h2>
+      <p id="setup-msg">Two keys and you're in. Both stay on this computer (saved to <code>config.json</code> next to <code>server.py</code>).</p>
+      <ol>
+        <li>Open the <a class="linkish" href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">Spotify Developer Dashboard</a> → <b>Create app</b> (or open your existing one). Tick <b>Web API</b> and add this Redirect URI:<br><code id="redirect-uri">http://127.0.0.1:5000/callback</code></li>
+        <li>Copy the app's <b>Client ID</b> (no secret needed — this uses PKCE).</li>
+        <li>Get a free <a class="linkish" href="https://getsongbpm.com/api" target="_blank" rel="noopener">GetSongBPM API key</a> for key/BPM lookups (Spotify no longer gives new apps this data).</li>
+      </ol>
+      <form id="setup-form" autocomplete="off">
+        <label class="field"><span>Spotify Client ID</span><input id="in-client" spellcheck="false" placeholder="e.g. 3f8a…"></label>
+        <label class="field"><span>GetSongBPM API key <small id="key-saved-note">— optional, but no auto key without it</small></span><input id="in-gsb" spellcheck="false" placeholder="paste API key"></label>
+        <div class="actions">
+          <button class="btn-green" type="submit">Save</button>
+          <button class="btn-ghost" type="button" id="setup-cancel" hidden>Cancel</button>
+          <a class="linkish" href="?demo">Preview demo</a>
+        </div>
+      </form>
+    </section>
+
+    <!-- public (GitHub Pages etc.) -->
+    <section class="center-card" id="view-public" hidden>
+      <h2>See the key of whatever you're playing on Spotify</h2>
+      <p>whatkeyisme shows your current Spotify track with a full play bar and its key signature: sharps and flats, Camelot code, BPM, the scale on a piano, and keys that mix well with it. Key and BPM data come from <a class="linkish" href="https://getsongbpm.com" target="_blank" rel="noopener">GetSongBPM</a>.</p>
+      <p>It runs on your own computer: download it from <a class="linkish" href="https://github.com/hrfofut/whatkeyisme" target="_blank" rel="noopener">GitHub</a>, run <code>python server.py</code>, and open http://127.0.0.1:5000.</p>
+      <a class="btn-green" href="?demo">Try the demo</a>
+    </section>
+
+    <!-- login -->
+    <section class="center-card" id="view-login" hidden>
+      <h2>See the key of whatever you're playing</h2>
+      <p>Connect your Spotify account to show the current track, control playback, and get its key signature, Camelot code and BPM.</p>
+      <button class="btn-green" id="login-btn">Connect Spotify</button>
+    </section>
+
+    <!-- idle -->
+    <section class="center-card" id="view-idle" hidden>
+      <h2 id="idle-title">Nothing playing</h2>
+      <p id="idle-msg">Start something in any Spotify app — phone, desktop, speaker — and it'll show up here.</p>
+      <a class="btn-ghost" href="https://open.spotify.com" target="_blank" rel="noopener">Open Spotify</a>
+    </section>
+
+    <!-- now playing -->
+    <section class="now" id="view-now" hidden>
+      <img class="art-lg" id="art-lg" alt="" crossorigin="anonymous">
+      <div>
+        <div class="eyebrow" id="eyebrow"><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span><span id="eyebrow-text">Now playing</span></div>
+        <h1 class="title"><a id="title" target="_blank" rel="noopener"></a></h1>
+        <div class="artists" id="artists"></div>
+        <div class="album" id="album"></div>
+
+        <div class="key-card" id="key-card" aria-live="polite"></div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer class="playbar" id="playbar">
+  <div class="pb-left">
+    <img class="art-sm" id="art-sm" alt="">
+    <div class="pb-meta">
+      <div class="pb-title" id="pb-title">—</div>
+      <div class="pb-artist" id="pb-artist"></div>
+    </div>
+  </div>
+
+  <div class="pb-center">
+    <div class="controls">
+      <button class="ctl" id="btn-shuffle" title="Shuffle" aria-label="Shuffle">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="M4 4l5 5"/></svg>
+      </button>
+      <button class="ctl" id="btn-prev" title="Previous" aria-label="Previous">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 5.5v13a1 1 0 0 1-1.55.83L8 13v6H5V5h3v6l9.45-6.33A1 1 0 0 1 19 5.5z"/></svg>
+      </button>
+      <button class="play" id="btn-play" title="Play" aria-label="Play">
+        <svg id="ico-play" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15a1 1 0 0 0 1.52.85l12.2-7.5a1 1 0 0 0 0-1.7l-12.2-7.5A1 1 0 0 0 7 4.5z"/></svg>
+        <svg id="ico-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" hidden><rect x="5" y="4" width="4.5" height="16" rx="1"/><rect x="14.5" y="4" width="4.5" height="16" rx="1"/></svg>
+      </button>
+      <button class="ctl" id="btn-next" title="Next" aria-label="Next">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M5 5.5v13a1 1 0 0 0 1.55.83L16 13v6h3V5h-3v6L6.55 4.67A1 1 0 0 0 5 5.5z"/></svg>
+      </button>
+      <button class="ctl" id="btn-repeat" title="Repeat" aria-label="Repeat">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
+        <span class="one" id="repeat-one" hidden>1</span>
+      </button>
+    </div>
+    <div class="progress-row">
+      <span class="time l" id="t-pos">0:00</span>
+      <div class="bar disabled" id="bar" role="slider" aria-label="Seek" tabindex="0" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="bar-track"><div class="bar-fill" id="bar-fill"></div><div class="bar-knob" id="bar-knob"></div></div>
+      </div>
+      <span class="time" id="t-dur">0:00</span>
+    </div>
+  </div>
+
+  <div class="pb-right">
+    <span class="key-chip" id="key-chip" hidden title="Key · Camelot"></span>
+    <div>
+      <div class="vol">
+        <button class="ctl" id="btn-mute" title="Mute" aria-label="Mute">
+          <svg id="ico-vol" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9h3l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16 9a4 4 0 0 1 0 6"/><path d="M18.5 6.5a7.5 7.5 0 0 1 0 11"/></svg>
+          <svg id="ico-mute" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" hidden><path d="M4 9h3l5-4v14l-5-4H4z" fill="currentColor"/><path d="m16 9 6 6M22 9l-6 6"/></svg>
+        </button>
+        <input type="range" id="vol" min="0" max="100" value="50" aria-label="Volume">
+      </div>
+      <div class="device" id="device" hidden>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M6 2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm6 9a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm0-6a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/></svg>
+        <span id="device-name"></span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<div class="attribution">Key &amp; BPM data from <a href="https://getsongbpm.com" target="_blank" rel="noopener">GetSongBPM</a></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* =====================================================================
+   Music theory: key parsing, key signatures, scales, Camelot wheel
+   ===================================================================== */
+const Theory = (() => {
+  const LETTERS = ['C','D','E','F','G','A','B'];
+  const LETTER_PC = { C:0, D:2, E:4, F:5, G:7, A:9, B:11 };
+  const FIFTHS_ORDER = 'FCGDAEB';
+  const INTERVALS = { major: [0,2,4,5,7,9,11], minor: [0,2,3,5,7,8,10] };
+  const MAJOR_NAMES = ['C','D♭','D','E♭','E','F','F♯','G','A♭','A','B♭','B'];
+  const MINOR_NAMES = ['C','C♯','D','E♭','E','F','F♯','G','G♯','A','B♭','B'];
+  const CAM_MINOR = [8,3,10,5,0,7,2,9,4,11,6,1]; // 1A..12A → pitch class
+  const CAM_MAJOR = [11,6,1,8,3,10,5,0,7,2,9,4]; // 1B..12B → pitch class
+  const ACC = { '-2':'𝄫', '-1':'♭', '0':'', '1':'♯', '2':'𝄪' };
+  const SHARP_ORDER = ['F','C','G','D','A','E','B'];
+  const FLAT_ORDER  = ['B','E','A','D','G','C','F'];
+
+  function parseName(str) {
+    if (str == null) return null;
+    let s = String(str).trim().replace(/♯/g, '#').replace(/♭/g, 'b').replace(/\s+/g, ' ');
+    if (!s) return null;
+    s = s[0].toUpperCase() + s.slice(1);
+    const m = s.match(/^([A-G])(##|#|bb|b)?\s*(major|maj|minor|min|m|M)?\.?$/);
+    if (!m) return null;
+    const acc = { '##': 2, '#': 1, 'bb': -2, 'b': -1 }[m[2]] || 0;
+    let mode = null;
+    if (m[3]) mode = (m[3] === 'M' || /^maj/i.test(m[3])) ? 'major' : 'minor';
+    return { letter: m[1], acc, mode };
+  }
+
+  function spell(letter, acc, mode) {
+    const ints = INTERVALS[mode];
+    const ri = LETTERS.indexOf(letter);
+    const rootPc = (LETTER_PC[letter] + acc + 12) % 12;
+    return ints.map((iv, i) => {
+      const L = LETTERS[(ri + i) % 7];
+      const target = (rootPc + iv) % 12;
+      let d = ((target - LETTER_PC[L]) % 12 + 12) % 12;
+      if (d > 6) d -= 12;
+      return { name: L + ACC[d], pc: target };
+    });
+  }
+
+  function signature(fifths) {
+    if (fifths === 0) return { count: 0, type: null, text: 'No sharps or flats', notes: [] };
+    const sharp = fifths > 0, n = Math.abs(fifths);
+    const notes = (sharp ? SHARP_ORDER : FLAT_ORDER).slice(0, n).map(l => l + (sharp ? '♯' : '♭'));
+    return { count: n, type: sharp ? 'sharp' : 'flat', text: `${n} ${sharp ? 'sharp' : 'flat'}${n > 1 ? 's' : ''}`, notes };
+  }
+
+  function camelotOf(pc, mode) {
+    return mode === 'minor' ? (CAM_MINOR.indexOf(pc) + 1) + 'A' : (CAM_MAJOR.indexOf(pc) + 1) + 'B';
+  }
+
+  function fromParts(letter, acc, mode) {
+    const pc = (LETTER_PC[letter] + acc + 12) % 12;
+    const base = FIFTHS_ORDER.indexOf(letter) - (mode === 'major' ? 1 : 4);
+    const fifths = base + 7 * acc;
+    if (Math.abs(fifths) > 7) return fromPc(pc, mode); // theoretical key → conventional spelling
+    return {
+      root: letter + ACC[acc], mode, pc, fifths,
+      name: `${letter + ACC[acc]} ${mode}`,
+      short: `${letter + ACC[acc]}${mode === 'minor' ? 'm' : ''}`,
+      camelot: camelotOf(pc, mode),
+      sig: signature(fifths),
+      scale: spell(letter, acc, mode),
+    };
+  }
+
+  function fromPc(pc, mode) {
+    pc = ((+pc % 12) + 12) % 12;
+    mode = mode === 'minor' ? 'minor' : 'major';
+    const p = parseName((mode === 'minor' ? MINOR_NAMES : MAJOR_NAMES)[pc]);
+    return fromParts(p.letter, p.acc, mode);
+  }
+
+  function fromCamelot(code) {
+    const m = String(code || '').trim().match(/^(\d{1,2})\s*([AB])$/i);
+    if (!m) return null;
+    const n = +m[1]; if (n < 1 || n > 12) return null;
+    const minor = m[2].toUpperCase() === 'A';
+    return fromPc((minor ? CAM_MINOR : CAM_MAJOR)[n - 1], minor ? 'minor' : 'major');
+  }
+
+  function parse(str) {
+    const p = parseName(str);
+    if (!p) return null;
+    return fromParts(p.letter, p.acc, p.mode || 'major');
+  }
+
+  function relative(k) {
+    return k.mode === 'minor' ? fromPc(k.pc + 3, 'major') : fromPc(k.pc + 9, 'minor');
+  }
+
+  function compatible(k) {
+    const n = parseInt(k.camelot, 10), L = k.camelot.slice(-1);
+    const wrap = x => ((x - 1 + 12) % 12) + 1;
+    return [`${wrap(n - 1)}${L}`, `${wrap(n + 1)}${L}`, `${n}${L === 'A' ? 'B' : 'A'}`].map(fromCamelot);
+  }
+
+  return { parse, fromPc, fromCamelot, relative, compatible, signature };
+})();
+
+/* =====================================================================
+   Helpers
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
+};
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const fmt = ms => { ms = Math.max(0, ms | 0); const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+let toastTimer;
+function toast(msg, ms = 3800) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+}
+function showView(name) {
+  for (const v of ['public', 'setup', 'login', 'idle', 'now']) $('view-' + v).hidden = v !== name;
+}
+
+/* =====================================================================
+   App state
+   ===================================================================== */
+const SCOPES = 'user-read-playback-state user-read-currently-playing user-modify-playback-state';
+const REDIRECT = location.origin + '/callback';
+const S = {
+  clientId: '', hasKeyApi: false, demo: false,
+  player: null, fetchedAt: 0, trackId: null, item: null,
+  keyFor: null, key: null, keyRes: null,
+  seeking: false, seekPreview: 0, pollTimer: null, endKick: false,
+  volBeforeMute: 50,
+};
+
+/* =====================================================================
+   Spotify auth (Authorization Code + PKCE — no client secret)
+   ===================================================================== */
+class AuthError extends Error {}
+const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+function randStr(n) { const a = new Uint8Array(n); crypto.getRandomValues(a); return b64url(a).slice(0, n); }
+
+async function login() {
+  const verifier = randStr(64), state = randStr(16);
+  const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
+  store.set('pkce', { verifier, state });
+  const q = new URLSearchParams({
+    response_type: 'code', client_id: S.clientId, scope: SCOPES, redirect_uri: REDIRECT,
+    code_challenge_method: 'S256', code_challenge: challenge, state,
+  });
+  location.href = 'https://accounts.spotify.com/authorize?' + q;
+}
+
+function saveAuth(j) {
+  const old = store.get('auth') || {};
+  store.set('auth', { access: j.access_token, refresh: j.refresh_token || old.refresh, exp: Date.now() + (j.expires_in || 3600) * 1000 });
+}
+
+async function handleCallback(params) {
+  const code = params.get('code'), err = params.get('error'), state = params.get('state');
+  history.replaceState(null, '', '/');
+  if (err) { toast('Spotify login cancelled (' + err + ')'); return; }
+  const saved = store.get('pkce');
+  if (!code || !saved || saved.state !== state) { toast('Login check failed — try connecting again.'); return; }
+  const r = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT, client_id: S.clientId, code_verifier: saved.verifier }),
+  });
+  const j = await r.json().catch(() => ({}));
+  store.del('pkce');
+  if (!r.ok) { toast('Spotify login failed: ' + (j.error_description || j.error || r.status), 7000); return; }
+  saveAuth(j);
+}
+
+let refreshing = null;
+function refresh() {
+  if (refreshing) return refreshing;
+  refreshing = (async () => {
+    const auth = store.get('auth');
+    if (!auth?.refresh) throw new AuthError('no refresh token');
+    const r = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: auth.refresh, client_id: S.clientId }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { store.del('auth'); throw new AuthError(j.error_description || 'refresh failed'); }
+    saveAuth(j);
+  })().finally(() => { refreshing = null; });
+  return refreshing;
+}
+
+async function accessToken() {
+  let auth = store.get('auth');
+  if (!auth) throw new AuthError('not logged in');
+  if (Date.now() > auth.exp - 60_000) { await refresh(); auth = store.get('auth'); }
+  return auth.access;
+}
+
+async function api(method, path, { query, body, retry = true } = {}) {
+  if (S.demo) return demoApi(method, path, query);
+  const token = await accessToken();
+  const url = 'https://api.spotify.com/v1' + path + (query ? '?' + new URLSearchParams(query) : '');
+  const r = await fetch(url, {
+    method, body: body ? JSON.stringify(body) : undefined,
+    headers: { Authorization: 'Bearer ' + token, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+  });
+  if (r.status === 401 && retry) { await refresh(); return api(method, path, { query, body, retry: false }); }
+  const text = await r.text();
+  let data = null; if (text) { try { data = JSON.parse(text); } catch {} }
+  if (!r.ok) {
+    const e = new Error(data?.error?.message || ('HTTP ' + r.status));
+    e.status = r.status; e.retryAfter = +r.headers.get('Retry-After') || 0; e.reason = data?.error?.reason;
+    throw e;
+  }
+  return data;
+}
+
+function logout() {
+  store.del('auth'); clearTimeout(S.pollTimer);
+  S.player = null; S.trackId = null; $('me').hidden = true;
+  renderPlaybar(null); showView('login');
+}
+
+/* =====================================================================
+   Polling + rendering the player
+   ===================================================================== */
+async function poll() {
+  clearTimeout(S.pollTimer);
+  let delay = document.hidden ? 10_000 : 2_500;
+  try {
+    const p = await api('GET', '/me/player', { query: { additional_types: 'episode' } });
+    applyPlayer(p);
+  } catch (e) {
+    if (e instanceof AuthError) { logout(); return; }
+    if (e.status === 429) delay = Math.max(5_000, e.retryAfter * 1000 || 5_000);
+    else if (e.status === 403) {
+      $('idle-title').textContent = 'Spotify blocked this account';
+      $('idle-msg').textContent = `${e.message}. In Development Mode, add your Spotify account's email under User Management in the app's dashboard (and the app owner needs Premium).`;
+      showView('idle'); delay = 15_000;
+    } else console.warn('poll failed', e);
+  }
+  S.pollTimer = setTimeout(poll, delay);
+}
+function pollSoon(ms = 350) { clearTimeout(S.pollTimer); S.pollTimer = setTimeout(poll, ms); }
+document.addEventListener('visibilitychange', () => { if (!document.hidden && store.get('auth') || S.demo) pollSoon(50); });
+
+function applyPlayer(p) {
+  S.player = p; S.fetchedAt = performance.now(); S.endKick = false;
+  const item = p?.item;
+  if (!item) {
+    $('idle-title').textContent = p?.currently_playing_type === 'ad' ? 'Ad break' : 'Nothing playing';
+    $('idle-msg').textContent = 'Start something in any Spotify app — phone, desktop, speaker — and it’ll show up here.';
+    showView('idle'); renderPlaybar(p); S.trackId = null; setKeyChip(null); return;
+  }
+  showView('now');
+  const id = item.id || item.uri;
+  if (id !== S.trackId) { S.trackId = id; S.item = item; renderTrack(item); loadKey(item); }
+  renderPlaybar(p);
+}
+
+function imagesOf(item) {
+  return (item.album?.images?.length ? item.album.images : item.images?.length ? item.images : item.show?.images) || [];
+}
+
+function renderTrack(item) {
+  const imgs = imagesOf(item);
+  const big = imgs[0]?.url || '', small = (imgs[imgs.length - 1] || imgs[0])?.url || '';
+  const art = $('art-lg');
+  art.onload = () => tintFrom(art);
+  art.src = big; art.alt = item.album?.name || item.name;
+  $('art-sm').src = small;
+  const t = $('title'); t.textContent = item.name; t.href = item.external_urls?.spotify || '#';
+  const isEp = item.type === 'episode';
+  $('artists').innerHTML = isEp
+    ? `<a href="${esc(item.show?.external_urls?.spotify || '#')}" target="_blank" rel="noopener">${esc(item.show?.name || 'Podcast')}</a>`
+    : (item.artists || []).map(a => `<a href="${esc(a.external_urls?.spotify || '#')}" target="_blank" rel="noopener">${esc(a.name)}</a>`).join('');
+  $('album').textContent = isEp ? '' : (item.album?.name || '');
+  $('pb-title').textContent = item.name;
+  $('pb-artist').textContent = isEp ? (item.show?.name || '') : (item.artists || []).map(a => a.name).join(', ');
+  document.title = `${item.name} · ${$('pb-artist').textContent}`;
+}
+
+function tintFrom(img) {
+  try {
+    const c = document.createElement('canvas'); c.width = c.height = 24;
+    const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0, 24, 24);
+    const d = x.getImageData(0, 0, 24, 24).data;
+    let r = 0, g = 0, b = 0, w = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const R = d[i], G = d[i + 1], B = d[i + 2];
+      const sat = Math.max(R, G, B) - Math.min(R, G, B);
+      const wt = 1 + sat / 32; r += R * wt; g += G * wt; b += B * wt; w += wt;
+    }
+    r /= w; g /= w; b /= w;
+    const k = Math.min(1, 150 / Math.max(r, g, b, 1)); // keep it moody, not neon
+    document.documentElement.style.setProperty('--tint', `${r * k | 0}, ${g * k | 0}, ${b * k | 0}`);
+  } catch { document.documentElement.style.setProperty('--tint', '40, 40, 40'); }
+}
+
+function renderPlaybar(p) {
+  const has = !!p?.item, dis = p?.actions?.disallows || {};
+  const playing = !!p?.is_playing;
+  $('ico-play').toggleAttribute('hidden', playing); $('ico-pause').toggleAttribute('hidden', !playing);
+  $('btn-play').title = $('btn-play').ariaLabel = playing ? 'Pause' : 'Play';
+  $('view-now').classList.toggle('paused', !playing);
+  $('eyebrow-text').textContent = playing ? 'Now playing' : 'Paused';
+  $('btn-play').disabled = !p;
+  $('btn-prev').disabled = !has || !!dis.skipping_prev;
+  $('btn-next').disabled = !has || !!dis.skipping_next;
+  $('btn-shuffle').disabled = !has || !!dis.toggling_shuffle;
+  $('btn-repeat').disabled = !has || !!(dis.toggling_repeat_context && dis.toggling_repeat_track);
+  $('btn-shuffle').classList.toggle('on', !!p?.shuffle_state);
+  const rep = p?.repeat_state || 'off';
+  $('btn-repeat').classList.toggle('on', rep !== 'off'); $('repeat-one').hidden = rep !== 'track';
+  $('bar').classList.toggle('disabled', !has || !!dis.seeking);
+  if (!has) {
+    $('pb-title').textContent = '—'; $('pb-artist').textContent = ''; $('art-sm').removeAttribute('src');
+    $('t-pos').textContent = '0:00'; $('t-dur').textContent = '0:00'; setBar(0);
+  }
+  const dev = p?.device;
+  $('device').hidden = !dev; $('device-name').textContent = dev ? dev.name : '';
+  const vol = $('vol');
+  vol.disabled = !dev || dev.supports_volume === false;
+  if (dev && dev.volume_percent != null && document.activeElement !== vol && !S.volDragging) setVol(dev.volume_percent);
+}
+
+function setVol(v) {
+  const vol = $('vol'); vol.value = v; vol.style.setProperty('--p', v + '%');
+  $('ico-vol').toggleAttribute('hidden', v == 0); $('ico-mute').toggleAttribute('hidden', v != 0);
+}
+
+function currentPos() {
+  const p = S.player; if (!p?.item) return 0;
+  let pos = p.progress_ms || 0;
+  if (p.is_playing) pos += performance.now() - S.fetchedAt;
+  return Math.min(pos, p.item.duration_ms || pos);
+}
+function setBar(frac) {
+  frac = Math.max(0, Math.min(1, frac || 0));
+  $('bar-fill').style.width = (frac * 100) + '%'; $('bar-knob').style.left = (frac * 100) + '%';
+  $('bar').setAttribute('aria-valuenow', Math.round(frac * 100));
+}
+function tick() {
+  const p = S.player;
+  if (p?.item) {
+    const dur = p.item.duration_ms || 1;
+    const pos = S.seeking ? S.seekPreview : currentPos();
+    setBar(pos / dur);
+    $('t-pos').textContent = fmt(pos); $('t-dur').textContent = fmt(dur);
+    if (p.is_playing && pos >= dur - 150 && !S.endKick) { S.endKick = true; pollSoon(700); }
+  }
+  requestAnimationFrame(tick);
+}
+
+/* ---------- controls ---------- */
+function cmdError(e) {
+  if (e instanceof AuthError) { logout(); return 'Please reconnect Spotify.'; }
+  if (e.status === 404) return 'No active device — press play in a Spotify app first.';
+  if (e.status === 403) return 'Spotify refused that (needs Premium, or the device doesn’t allow it).';
+  if (e.status === 429) return 'Slow down — Spotify rate-limited us for a moment.';
+  return 'Couldn’t do that: ' + e.message;
+}
+async function cmd(run, optimistic) {
+  try { optimistic?.(); await run(); } catch (e) { toast(cmdError(e)); }
+  pollSoon(400);
+}
+function snapshotPos() { if (S.player) { S.player.progress_ms = currentPos(); S.fetchedAt = performance.now(); } }
+
+$('btn-play').onclick = () => {
+  const playing = !!S.player?.is_playing;
+  cmd(() => api('PUT', playing ? '/me/player/pause' : '/me/player/play'),
+      () => { snapshotPos(); if (S.player) { S.player.is_playing = !playing; renderPlaybar(S.player); } });
+};
+$('btn-next').onclick = () => cmd(() => api('POST', '/me/player/next'));
+$('btn-prev').onclick = () => {
+  // Like Spotify: >3s in → restart the track, otherwise go to previous
+  if (currentPos() > 3000) return cmd(() => api('PUT', '/me/player/seek', { query: { position_ms: 0 } }), () => { if (S.player) { S.player.progress_ms = 0; S.fetchedAt = performance.now(); } });
+  cmd(() => api('POST', '/me/player/previous'));
+};
+$('btn-shuffle').onclick = () => {
+  const next = !S.player?.shuffle_state;
+  cmd(() => api('PUT', '/me/player/shuffle', { query: { state: next } }), () => { S.player.shuffle_state = next; renderPlaybar(S.player); });
+};
+$('btn-repeat').onclick = () => {
+  const order = ['off', 'context', 'track'];
+  const next = order[(order.indexOf(S.player?.repeat_state || 'off') + 1) % 3];
+  cmd(() => api('PUT', '/me/player/repeat', { query: { state: next } }), () => { S.player.repeat_state = next; renderPlaybar(S.player); });
+};
+
+// seek bar (click or drag)
+(() => {
+  const bar = $('bar');
+  const fracAt = ev => { const r = bar.getBoundingClientRect(); return Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)); };
+  bar.addEventListener('pointerdown', ev => {
+    if (!S.player?.item) return;
+    S.seeking = true; bar.classList.add('drag'); bar.setPointerCapture(ev.pointerId);
+    S.seekPreview = fracAt(ev) * S.player.item.duration_ms;
+  });
+  bar.addEventListener('pointermove', ev => { if (S.seeking) S.seekPreview = fracAt(ev) * S.player.item.duration_ms; });
+  const end = ev => {
+    if (!S.seeking) return;
+    S.seeking = false; bar.classList.remove('drag');
+    const pos = Math.round(fracAt(ev) * S.player.item.duration_ms);
+    cmd(() => api('PUT', '/me/player/seek', { query: { position_ms: pos } }), () => { S.player.progress_ms = pos; S.fetchedAt = performance.now(); });
+  };
+  bar.addEventListener('pointerup', end); bar.addEventListener('pointercancel', () => { S.seeking = false; bar.classList.remove('drag'); });
+  bar.addEventListener('keydown', ev => {
+    if (!S.player?.item || !['ArrowLeft', 'ArrowRight'].includes(ev.key)) return;
+    ev.preventDefault();
+    const pos = Math.max(0, Math.min(S.player.item.duration_ms, currentPos() + (ev.key === 'ArrowRight' ? 5000 : -5000)));
+    cmd(() => api('PUT', '/me/player/seek', { query: { position_ms: Math.round(pos) } }), () => { S.player.progress_ms = pos; S.fetchedAt = performance.now(); });
+  });
+})();
+
+// volume
+let volTimer;
+$('vol').addEventListener('input', e => {
+  const v = +e.target.value; setVol(v); S.volDragging = true;
+  clearTimeout(volTimer);
+  volTimer = setTimeout(() => { S.volDragging = false; cmd(() => api('PUT', '/me/player/volume', { query: { volume_percent: v } }), () => { if (S.player?.device) S.player.device.volume_percent = v; }); }, 220);
+});
+$('btn-mute').onclick = () => {
+  const cur = +$('vol').value;
+  const v = cur > 0 ? 0 : (S.volBeforeMute || 50);
+  if (cur > 0) S.volBeforeMute = cur;
+  setVol(v);
+  cmd(() => api('PUT', '/me/player/volume', { query: { volume_percent: v } }));
+};
+
+// space = play/pause
+document.addEventListener('keydown', e => {
+  if (e.code !== 'Space' || /INPUT|SELECT|TEXTAREA|BUTTON/.test(e.target.tagName)) return;
+  if (!$('view-now').hidden || !$('view-idle').hidden) { e.preventDefault(); $('btn-play').click(); }
+});
+
+/* =====================================================================
+   Key lookup: manual override → cache → Spotify audio-features (old apps)
+               → GetSongBPM via local server
+   ===================================================================== */
+async function loadKey(item) {
+  const id = item.id || item.uri;
+  S.keyFor = id; S.key = null; renderKey({ status: 'loading' }); setKeyChip(null);
+  if (item.type === 'episode') return renderKey({ status: 'na' });
+
+  const ovr = store.get('ovr:' + id);
+  if (ovr) return setKey(id, { ...ovr, found: true, source: 'manual' });
+  const cached = store.get('k1:' + id);
+  if (cached && (cached.found || Date.now() - cached.at < 3 * 864e5)) return setKey(id, cached);
+
+  const title = item.name, artists = (item.artists || []).map(a => a.name);
+  let res = null;
+
+  if (item.id && !S.demo && !store.get('noAudioFeatures')) {
+    try {
+      const af = await api('GET', '/audio-features/' + item.id);
+      if (af && af.key >= 0) res = { found: true, pc: af.key, mode: af.mode ? 'major' : 'minor', tempo: Math.round(af.tempo), time_sig: af.time_signature ? af.time_signature + '/4' : '', source: 'spotify', at: Date.now() };
+    } catch (e) { if ([403, 404, 410].includes(e.status)) store.set('noAudioFeatures', true); }
+  }
+
+  if (!res) {
+    if (S.demo) res = demoKey();
+    else if (!S.hasKeyApi) res = { found: false, reason: 'no_api_key', transient: true };
+    else {
+      try {
+        const q = new URLSearchParams({ title, artist: artists[0] || '', artists: artists.join('|') });
+        const j = await (await fetch('/api/key?' + q)).json();
+        res = j.error ? { found: false, reason: j.error, msg: j.message, transient: true } : { ...j, source: 'getsongbpm', at: Date.now() };
+      } catch { res = { found: false, reason: 'server', msg: 'Local server not reachable — is server.py running?', transient: true }; }
+    }
+  }
+  if (!res.transient) store.set('k1:' + id, res);
+  if (S.keyFor === id) setKey(id, res);
+}
+
+function setKey(id, res) {
+  if (S.keyFor !== id) return;
+  let k = null;
+  if (res.found) {
+    if (res.pc != null) k = Theory.fromPc(res.pc, res.mode);
+    if (!k && res.key_of) k = Theory.parse(res.key_of);
+    if (!k && res.camelot) k = Theory.fromCamelot(res.camelot);
+  }
+  S.key = k; S.keyRes = res;
+  if (!k) return renderKey({ status: 'missing', res });
+  renderKey({ status: 'ok', k, res }); setKeyChip(k);
+}
+
+function setKeyChip(k) {
+  const c = $('key-chip');
+  if (!k) { c.hidden = true; return; }
+  c.hidden = false; c.innerHTML = `<span class="k">${esc(k.short)}</span>${esc(k.camelot)}`;
+}
+
+function pianoHTML(k) {
+  const inScale = new Map(k.scale.map(n => [n.pc, n.name]));
+  const WHITE = [0, 2, 4, 5, 7, 9, 11], BLACK = [[1, 0], [3, 1], [6, 3], [8, 4], [10, 5]];
+  const octaves = 2, nW = 7 * octaves, w = 100 / nW, bw = w * 0.62;
+  let html = '';
+  for (let o = 0; o < octaves; o++) for (const pc of WHITE) {
+    const cls = pc === k.pc ? 'root' : inScale.has(pc) ? 'in' : '';
+    html += `<div class="wk ${cls}">${cls ? `<span class="nlab">${esc(inScale.get(pc))}</span>` : ''}</div>`;
+  }
+  for (let o = 0; o < octaves; o++) for (const [pc, wi] of BLACK) {
+    const cls = pc === k.pc ? 'root' : inScale.has(pc) ? 'in' : '';
+    const left = (o * 7 + wi + 1) * w - bw / 2;
+    html += `<div class="bk ${cls}" style="left:${left}%;width:${bw}%">${cls ? `<span class="nlab">${esc(inScale.get(pc))}</span>` : ''}</div>`;
+  }
+  return html;
+}
+
+function fixSelect(current) {
+  let opts = '<option value="">Wrong key? Set it…</option>';
+  for (const mode of ['major', 'minor']) {
+    opts += `<optgroup label="${mode[0].toUpperCase() + mode.slice(1)}">`;
+    for (let pc = 0; pc < 12; pc++) {
+      const k = Theory.fromPc(pc, mode);
+      const sel = current && current.pc === pc && current.mode === mode ? ' selected' : '';
+      opts += `<option value="${pc}|${mode}"${sel}>${esc(k.name)} · ${k.camelot}</option>`;
+    }
+    opts += '</optgroup>';
+  }
+  return `<select class="fix" id="fix-key" aria-label="Set key manually">${opts}</select>`;
+}
+
+function renderKey(st) {
+  const card = $('key-card');
+  if (st.status === 'loading') {
+    card.innerHTML = `<div class="key-label">Key signature</div>
+      <div class="skeleton" style="height:56px;width:260px;margin-top:10px"></div>
+      <div class="skeleton" style="height:96px;margin-top:22px"></div>`;
+    return;
+  }
+  if (st.status === 'na') { card.innerHTML = `<div class="key-label">Key signature</div><p class="key-empty">Podcasts don’t have a key — play some music.</p>`; return; }
+
+  if (st.status === 'missing') {
+    const r = st.res || {};
+    let why = 'Couldn’t find this track on GetSongBPM.';
+    if (r.reason === 'no_api_key') why = 'No GetSongBPM API key saved, so automatic key lookup is off. Add one in <a class="linkish" href="#" data-open-settings>settings</a>, or set the key yourself.';
+    else if (r.msg) why = esc(r.msg);
+    card.innerHTML = `<div class="key-label">Key signature</div>
+      <p class="key-empty" style="margin:10px 0 14px"><b>Key unknown.</b> ${why}</p>
+      <div class="key-foot" style="border:0;padding:0;margin:0">
+        <span>${r.reason ? '' : `Try <a href="https://tunebat.com/Search?q=${encodeURIComponent(S.item?.name + ' ' + (S.item?.artists?.[0]?.name || ''))}" target="_blank" rel="noopener">Tunebat</a> or <a href="https://songbpm.com/searches?q=${encodeURIComponent(S.item?.name + ' ' + (S.item?.artists?.[0]?.name || ''))}" target="_blank" rel="noopener">SongBPM</a>, then set it here →`}</span>
+        ${fixSelect(null)}
+      </div>`;
+    wireKeyCard();
+    return;
+  }
+
+  const { k, res } = st;
+  const rel = Theory.relative(k);
+  const comp = Theory.compatible(k);
+  const sigNotes = k.sig.notes.length ? ` — ${k.sig.notes.join(' ')}` : '';
+  const bpm = res.tempo ? Math.round(+res.tempo) : '—';
+  const ts = res.time_sig || '—';
+
+  let src = '';
+  if (res.source === 'manual') src = `Set manually · <a href="#" id="clear-ovr">use automatic</a>`;
+  else if (res.source === 'spotify') src = `From Spotify audio features`;
+  else if (res.source === 'getsongbpm') {
+    const m = res.matched_title ? `matched “${esc(res.matched_title)}”${res.matched_artist ? ' by ' + esc(res.matched_artist) : ''}` : '';
+    src = `From <a href="${esc(res.uri || 'https://getsongbpm.com')}" target="_blank" rel="noopener">GetSongBPM</a>${m ? ' · ' + m : ''}${res.confidence === 'medium' ? ' · <span class="warn">close match — double-check</span>' : ''}`;
+  } else if (res.source === 'demo') src = 'Demo data';
+
+  card.innerHTML = `
+    <div class="key-top">
+      <div>
+        <div class="key-label">Key signature</div>
+        <div class="key-name">${esc(k.root)} <span class="mode">${k.mode}</span></div>
+        <div class="key-sig"><b>${esc(k.sig.text)}</b>${esc(sigNotes)} · relative ${esc(rel.name)}</div>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="v">${esc(k.camelot)}</div><div class="l">Camelot</div></div>
+        <div class="stat"><div class="v">${esc(bpm)}</div><div class="l">BPM</div></div>
+        <div class="stat"><div class="v">${esc(ts)}</div><div class="l">Time</div></div>
+      </div>
+    </div>
+    <div class="piano" aria-label="Notes in ${esc(k.name)}">${pianoHTML(k)}</div>
+    <div class="row"><span class="row-label">Scale</span>${k.scale.map((n, i) => `<span class="chip${i === 0 ? ' root' : ''}">${esc(n.name)}</span>`).join('')}</div>
+    <div class="row"><span class="row-label">Mixes with</span>${comp.map(c => `<span class="chip"><span class="cam">${c.camelot}</span>${esc(c.name)}</span>`).join('')}</div>
+    <div class="key-foot"><span>${src}</span>${fixSelect(res.source === 'manual' ? k : null)}</div>`;
+  wireKeyCard();
+}
+
+function wireKeyCard() {
+  const sel = $('fix-key');
+  if (sel) sel.onchange = () => {
+    if (!sel.value || !S.trackId) return;
+    const [pc, mode] = sel.value.split('|');
+    store.set('ovr:' + S.trackId, { pc: +pc, mode });
+    setKey(S.trackId, { found: true, pc: +pc, mode, source: 'manual', tempo: S.keyRes?.tempo, time_sig: S.keyRes?.time_sig });
+  };
+  const clr = $('clear-ovr');
+  if (clr) clr.onclick = e => { e.preventDefault(); store.del('ovr:' + S.trackId); if (S.item) loadKey(S.item); };
+  document.querySelectorAll('[data-open-settings]').forEach(a => a.onclick = e => { e.preventDefault(); openSetup(true); });
+}
+
+/* =====================================================================
+   Setup / settings
+   ===================================================================== */
+function openSetup(cancellable) {
+  $('redirect-uri').textContent = REDIRECT;
+  $('in-client').value = S.clientId || '';
+  $('in-gsb').value = '';
+  $('in-gsb').placeholder = S.hasKeyApi ? 'saved — paste a new one to replace' : 'paste API key';
+  $('setup-cancel').hidden = !cancellable;
+  showView('setup');
+}
+$('setup-cancel').onclick = () => location.reload();
+$('setup-form').onsubmit = async e => {
+  e.preventDefault();
+  const body = { spotify_client_id: $('in-client').value.trim(), getsongbpm_api_key: $('in-gsb').value.trim() };
+  if (!body.spotify_client_id) return toast('Paste your Spotify Client ID first.');
+  try {
+    const r = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json();
+    if (!r.ok) return toast(j.message || 'Couldn’t save settings.');
+    if (body.spotify_client_id !== S.clientId) store.del('auth');
+    location.reload();
+  } catch { toast('Local server not reachable — run server.py.'); }
+};
+$('settings-btn').onclick = () => {
+  if (S.demo) return toast('Demo mode — run server.py and open http://127.0.0.1:5000 for the real thing.');
+  if (!$('view-setup').hidden) return;
+  if (store.get('auth') && confirm('Disconnect Spotify?\n\nOK = disconnect · Cancel = edit API keys')) return logout();
+  openSetup(true);
+};
+$('login-btn').onclick = login;
+
+async function loadMe() {
+  try {
+    const me = await api('GET', '/me');
+    if (!me) return;
+    $('me-name').textContent = me.display_name || me.id;
+    const img = me.images?.[0]?.url, av = $('me-av');
+    av.innerHTML = img ? `<img src="${esc(img)}" alt="">` : esc((me.display_name || '?')[0]);
+    $('me').hidden = false;
+  } catch {}
+}
+
+/* =====================================================================
+   Demo mode (?demo) — preview without any keys
+   ===================================================================== */
+function demoArt() {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5b2a86"/><stop offset="1" stop-color="#e2587a"/></linearGradient></defs><rect width="300" height="300" fill="url(#g)"/><circle cx="150" cy="150" r="92" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2"/><circle cx="150" cy="150" r="56" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2"/><circle cx="150" cy="150" r="8" fill="#fff"/></svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+const DEMO = {
+  is_playing: true, progress_ms: 61_000, shuffle_state: false, repeat_state: 'off', currently_playing_type: 'track',
+  device: { name: 'Demo speaker', volume_percent: 64, supports_volume: true }, actions: { disallows: {} },
+  item: { id: 'demo1', type: 'track', name: 'Velvet Static', duration_ms: 214_000, external_urls: {},
+          artists: [{ name: 'Demo Artist', external_urls: {} }], album: { name: 'Night Shapes', images: [{ url: demoArt() }] } },
+};
+function demoKey() {
+  return { found: true, key_of: 'F♯m', camelot: '11A', tempo: '122', time_sig: '4/4', source: 'demo', at: Date.now() };
+}
+async function demoApi(method, path, query) {
+  const p = DEMO;
+  const now = () => { p.progress_ms = Math.min(p.item.duration_ms, p.progress_ms + (p.is_playing ? performance.now() - (DEMO._t || performance.now()) : 0)); DEMO._t = performance.now(); };
+  now();
+  if (path === '/me/player') return JSON.parse(JSON.stringify({ ...p, item: p.item }));
+  if (path === '/me') return { display_name: 'Demo user' };
+  if (path.endsWith('/play')) p.is_playing = true;
+  else if (path.endsWith('/pause')) p.is_playing = false;
+  else if (path.endsWith('/seek')) p.progress_ms = +query.position_ms;
+  else if (path.endsWith('/shuffle')) p.shuffle_state = query.state === true || query.state === 'true';
+  else if (path.endsWith('/repeat')) p.repeat_state = query.state;
+  else if (path.endsWith('/volume')) p.device.volume_percent = +query.volume_percent;
+  else if (path.endsWith('/next') || path.endsWith('/previous')) { p.progress_ms = 0; toast('Demo mode: next/previous just restart the track.'); }
+  return null;
+}
+
+/* =====================================================================
+   Boot
+   ===================================================================== */
+async function boot() {
+  requestAnimationFrame(tick);
+  if (location.hostname === 'localhost') { location.replace(location.href.replace('//localhost', '//127.0.0.1')); return; }
+  const params = new URLSearchParams(location.search);
+  if (params.has('demo')) { S.demo = true; DEMO._t = performance.now(); loadMe(); return poll(); }
+  if (location.protocol === 'file:') {
+    openSetup(false);
+    $('setup-msg').innerHTML = 'This page needs its little server: run <code>python3 server.py</code> and open <a class="linkish" href="http://127.0.0.1:5000">http://127.0.0.1:5000</a>. (Or <a class="linkish" href="?demo">preview the demo</a>.)';
+    $('setup-form').hidden = true;
+    return;
+  }
+  if (!['127.0.0.1', '[::1]'].includes(location.hostname)) { showView('public'); return; }
+  try { const c = await (await fetch('/api/config')).json(); S.clientId = c.clientId || ''; S.hasKeyApi = !!c.hasKeyApi; } catch {}
+  if (location.pathname === '/callback') await handleCallback(params);
+  if (!S.clientId) return openSetup(false);
+  if (!store.get('auth')) return showView('login');
+  loadMe();
+  poll();
+}
+boot();
+</script>
+</body>
+</html>
